@@ -5,49 +5,86 @@ from os import getenv
 
 from aiogram import Bot, Dispatcher, Router, types
 from aiogram.enums import ParseMode
-from aiogram.filters import CommandStart
-from aiogram.types import Message
+from aiogram.filters import CommandStart, Command
+from aiogram.types import Message, InputMediaPhoto, FSInputFile
 from aiogram.utils.markdown import hbold
 
-# Bot token can be obtained via https://t.me/BotFather
+import utils
+
 TOKEN = getenv("BOT_TOKEN")
-print(TOKEN)
-# All handlers should be attached to the Router (or Dispatcher)
 dp = Dispatcher()
 
+CACHE = {
+}
+
+NEW_SET_MSG = "Таргет установлен на банк: "
+ERROR_MSG = "ERROR"
+
+
+WHITELIST = ["JPM", "WFC", "Citi", "BAC"]
+
+TARGET = WHITELIST[0]
 
 @dp.message(CommandStart())
 async def command_start_handler(message: Message) -> None:
-    """
-    This handler receives messages with `/start` command
-    """
-    # Most event objects have aliases for API methods that can be called in events' context
-    # For example if you want to answer to incoming message you can use `message.answer(...)` alias
-    # and the target chat will be passed to :ref:`aiogram.methods.send_message.SendMessage`
-    # method automatically or call API method directly via
-    # Bot instance: `bot.send_message(chat_id=message.chat.id, ...)`
-    await message.answer(f"Hello, {hbold(message.from_user.full_name)}!")
+    await message.answer(utils.START_MSG)
 
 
-@dp.message()
-async def echo_handler(message: types.Message) -> None:
-    """
-    Handler will forward receive a message back to the sender
-
-    By default, message handler will handle all message types (like a text, photo, sticker etc.)
-    """
+@dp.message(Command(commands="getCache"))
+async def get_cache_handler(message: types.Message) -> None:
     try:
-        # Send a copy of the received message
-        await message.send_copy(chat_id=message.chat.id)
+        await message.answer(str(CACHE))
     except TypeError:
-        # But not all the types is supported to be copied so need to handle it
-        await message.answer("Nice try!")
+        await message.answer(ERROR_MSG)
 
+
+@dp.message(Command(commands="graph"))
+async def get_cache_handler(message: types.Message) -> None:
+    try:
+        name = utils.picture_from_graph(TARGET)
+        photo = FSInputFile(name)
+        await message.answer_photo(photo, caption=TARGET)
+    except TypeError:
+        await message.answer(ERROR_MSG)
+
+
+@dp.message(Command(commands="JPM"))
+async def set_jpm_handler(message: types.Message):
+    TARGET = WHITELIST[0]
+    await message.answer(NEW_SET_MSG + TARGET)
+
+@dp.message(Command(commands="WFC"))
+async def set_wfc_handler(message: types.Message):
+    TARGET = WHITELIST[1]
+    await message.answer(NEW_SET_MSG + TARGET)
+
+@dp.message(Command(commands="Citi"))
+async def set_citi_handler(message: types.Message):
+    TARGET = WHITELIST[2]
+    await message.answer(NEW_SET_MSG + TARGET)
+
+@dp.message(Command(commands="BAC"))
+async def set_bac_handler(message: types.Message):
+    TARGET = WHITELIST[3]
+    await message.answer(NEW_SET_MSG + TARGET)
+
+@dp.message(Command(commands="forecast"))
+async def get_handler(message: types.Message):
+    if not TARGET in CACHE:
+        CACHE[TARGET] = TARGET + "\n" + utils.dict_to_str(utils.get_all_forecast(TARGET))
+    
+    await message.answer(CACHE[TARGET])
+
+@dp.message(Command(commands="clearCache"))
+async def get_cache_handler(message: types.Message) -> None:
+    CACHE = {}
+    try:
+        await message.answer(str(CACHE))
+    except TypeError:
+        await message.answer(ERROR_MSG)
 
 async def main() -> None:
-    # Initialize Bot instance with a default parse mode which will be passed to all API calls
     bot = Bot(TOKEN, parse_mode=ParseMode.HTML)
-    # And the run events dispatching
     await dp.start_polling(bot)
 
 
